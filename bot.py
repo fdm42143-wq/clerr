@@ -17,21 +17,21 @@ async def run_collector(session_string, account_index):
     async with client:
         print(f"🚀 الحساب #{account_index} متصل وجاهز للعمل.")
         
-        # 1. الخطوة الأولى لأول مرة فقط لكل بوت: /start ثم "ستار"
+        # 1. التفعيل الأولي (أول مرة فقط عند تشغيل البوت لكل بوت)
         for target_bot in TARGET_BOTS:
             try:
-                print(f"⭐ [الحساب #{account_index}] التفعيل الأولي (ستار) للبوت: {target_bot}")
+                print(f"⭐ [الحساب #{account_index}] إرسال التفعيل الأولي (ستار) لـ {target_bot}")
                 await client.send_message(target_bot, '/start')
                 await asyncio.sleep(4)
                 await client.send_message(target_bot, 'ستار')
                 await asyncio.sleep(5)
             except Exception as e:
-                print(f"⚠️ خطأ في التفعيل الأولي لـ {target_bot}: {e}")
+                print(f"⚠️ تنبيه في التفعيل الأولي لـ {target_bot}: {e}")
 
         # 2. حلقة التجميع المستمرة بالخطوات الصحيحة
         while True:
             for target_bot in TARGET_BOTS:
-                print(f"🔄 [الحساب #{account_index}] بدء جولة التجميع في: {target_bot}")
+                print(f"🔄 [الحساب #{account_index}] بدء التجميع في البوت: {target_bot}")
                 
                 for _ in range(5):
                     try:
@@ -63,7 +63,7 @@ async def run_collector(session_string, account_index):
                             await asyncio.sleep(5)
                             continue
                         
-                        # ج) الانتقال إلى خانة "قنوات"
+                        # ج) الدخول إلى قسم "قنوات"
                         menu_msg_list = await client.get_messages(target_bot, limit=1)
                         if not menu_msg_list or not menu_msg_list[0].reply_markup:
                             await asyncio.sleep(5)
@@ -83,14 +83,14 @@ async def run_collector(session_string, account_index):
                                 break
                         
                         if not channels_clicked:
-                            print(f"⚠️ [الحساب #{account_index}] لم يتم العثور على زر قنوات في {target_bot}")
+                            print(f⚠️ [الحساب #{account_index}] زر القنوات غير موجود حالياً.")
                             await asyncio.sleep(6)
                             break
                         
-                        # د) الضغط على "فتح القناة" والانضمام إليها
+                        # د) فتح القناة والاشتراك فيها
                         chan_msg_list = await client.get_messages(target_bot, limit=1)
                         if not chan_msg_list or not chan_msg_list[0].reply_markup:
-                            print(f"⚠️ [الحساب #{account_index}] لا توجد قنوات متاحة حالياً.")
+                            print(f"⚠️ [الحساب #{account_index}] لا توجد قنوات متاحة للتجميع حالياً.")
                             await asyncio.sleep(8)
                             break
                         
@@ -113,7 +113,7 @@ async def run_collector(session_string, account_index):
                         if not opened:
                             break
                         
-                        # هـ) الضغط على زر "تحقق" أو "تاكيد" لاحتساب النقاط
+                        # هـ) الضغط على زر "تحقق" أو "تأكيد" لاحتساب النقاط
                         await asyncio.sleep(4)
                         verify_msg_list = await client.get_messages(target_bot, limit=1)
                         if verify_msg_list and verify_msg_list[0].reply_markup:
@@ -123,7 +123,7 @@ async def run_collector(session_string, account_index):
                                 for button in row.buttons:
                                     b_text = button.text.lower()
                                     if any(kw in b_text for kw in ["تحقق", "تاكيد", "تأكيد", "تم", "✓", "✅"]):
-                                        print(f"✅ [الحساب #{account_index}] تم الضغط على زر: {button.text} واكتساب النقاط.")
+                                        print(f"✅ [الحساب #{account_index}] تم الضغط على زر التحقق: {button.text}")
                                         await v_msg.click(data=button.data)
                                         await asyncio.sleep(4)
                                         verified = True
@@ -140,12 +140,12 @@ async def run_collector(session_string, account_index):
                 
                 await asyncio.sleep(5)
             
-            print(f"⏳ [الحساب #{account_index}] استراحة أمان بين جولات التجميع...")
+            print(f"⏳ [الحساب #{account_index}] استراحة أمان مؤقتة...")
             await asyncio.sleep(120)
 
 async def main():
     if not API_ID or not API_HASH or not SESSIONS or not TARGET_BOTS:
-        print("⚠️ خطأ في متغيرات Railway.")
+        print("⚠️ خطأ: يرجى التأكد من ضبط المتغيرات في Railway.")
         return
 
     tasks = [run_collector(session, i + 1) for i, session in enumerate(SESSIONS)]
