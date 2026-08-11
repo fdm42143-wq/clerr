@@ -2,6 +2,7 @@ import os
 import asyncio
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from telethon.tl.functions.channels import JoinChannelRequest
 
 API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
@@ -15,23 +16,23 @@ async def run_collector(session_string, account_index):
     client = TelegramClient(StringSession(session_string), API_ID, API_HASH)
     
     async with client:
-        print(f"🚀 الحساب #{account_index} متصل وجاهز للعمل.")
+        print(f"Account #{account_index} is connected and ready.")
         
-        # 1. التفعيل الأولي (أول مرة فقط عند تشغيل البوت لكل بوت)
+        # 1. التفعيل الأولي (أول مرة فقط لكل بوت)
         for target_bot in TARGET_BOTS:
             try:
-                print(f"⭐ [الحساب #{account_index}] إرسال التفعيل الأولي (ستار) لـ {target_bot}")
+                print(f"Initial activation (Star) for {target_bot}")
                 await client.send_message(target_bot, '/start')
                 await asyncio.sleep(4)
                 await client.send_message(target_bot, 'ستار')
                 await asyncio.sleep(5)
             except Exception as e:
-                print(f"⚠️ تنبيه في التفعيل الأولي لـ {target_bot}: {e}")
+                print(f"Initial activation notice for {target_bot}: {e}")
 
-        # 2. حلقة التجميع المستمرة بالخطوات الصحيحة
+        # 2. حلقة التجميع المستمرة
         while True:
             for target_bot in TARGET_BOTS:
-                print(f"🔄 [الحساب #{account_index}] بدء التجميع في البوت: {target_bot}")
+                print(f"Starting collection loop in: {target_bot}")
                 
                 for _ in range(5):
                     try:
@@ -51,7 +52,7 @@ async def run_collector(session_string, account_index):
                         for row in last_msg.reply_markup.rows:
                             for button in row.buttons:
                                 if "تجميع النقاط" in button.text:
-                                    print(f"📌 [الحساب #{account_index}] الضغط على: {button.text}")
+                                    print(f"Clicking points button: {button.text}")
                                     await last_msg.click(data=button.data)
                                     await asyncio.sleep(4)
                                     points_clicked = True
@@ -74,7 +75,7 @@ async def run_collector(session_string, account_index):
                         for row in menu_msg.reply_markup.rows:
                             for button in row.buttons:
                                 if "قنوات" in button.text:
-                                    print(f"📌 [الحساب #{account_index}] الدخول إلى قسم: {button.text}")
+                                    print(f"Entering channels section: {button.text}")
                                     await menu_msg.click(data=button.data)
                                     await asyncio.sleep(4)
                                     channels_clicked = True
@@ -83,37 +84,54 @@ async def run_collector(session_string, account_index):
                                 break
                         
                         if not channels_clicked:
-                            print(f⚠️ [الحساب #{account_index}] زر القنوات غير موجود حالياً.")
+                            print("Channels button not found currently.")
                             await asyncio.sleep(6)
                             break
                         
-                        # د) فتح القناة والاشتراك فيها
+                        # د) استخراج رابط القناة والانضمام إليها فعلياً
                         chan_msg_list = await client.get_messages(target_bot, limit=1)
                         if not chan_msg_list or not chan_msg_list[0].reply_markup:
-                            print(f"⚠️ [الحساب #{account_index}] لا توجد قنوات متاحة للتجميع حالياً.")
+                            print("No channels available for collection right now.")
                             await asyncio.sleep(8)
                             break
                         
                         chan_msg = chan_msg_list[0]
-                        opened = False
+                        channel_entity = None
+                        
                         for row in chan_msg.reply_markup.rows:
                             for button in row.buttons:
                                 if any(w in button.text for w in ["فتح", "القناة", "اشتراك"]):
-                                    print(f"📌 [الحساب #{account_index}] النقر على: {button.text}")
-                                    try:
-                                        await chan_msg.click(data=button.data)
-                                    except Exception:
-                                        pass
-                                    await asyncio.sleep(6)
-                                    opened = True
+                                    # محاولة استخراج يوزر أو رابط القناة من الأزرار
+                                    if hasattr(button, 'url') and button.url:
+                                        channel_entity = button.url
                                     break
-                            if opened:
+                            if channel_entity:
                                 break
                         
-                        if not opened:
-                            break
-                        
-                        # هـ) الضغط على زر "تحقق" أو "تأكيد" لاحتساب النقاط
+                        # إذا لم يوجد رابط مباشر في الزر، نستخرج الرابط من نص الرسالة
+                        if not channel_entity and chan_msg.text:
+                            import re
+                            urls = re.findall(r'(https://t\.me/\+[\w-]+|https://t\.me/[\w_]+|@[\w_]+)', chan_msg.text)
+                            if urls:
+                                channel_entity = urls[0]
+
+                        # النقر على زر فتح القناة افتراضياً
+                        try:
+                            await chan_msg.click(0)
+                        except Exception:
+                            pass
+                        await asyncio.sleep(4)
+
+                        # الانضمام الفعلي للقناة
+                        if channel_entity:
+                            try:
+                                print(f"Joining channel: {channel_entity}")
+                                await client(JoinChannelRequest(channel_entity))
+                                await asyncio.sleep(3)
+                            except Exception as join_err:
+                                print(f"Notice during join: {join_err}")
+
+                        # هـ) العودة للبوت والضغط على "تحقق" (لـ EEObot) أو "تأكيد" (لـ hhkra074bot)
                         await asyncio.sleep(4)
                         verify_msg_list = await client.get_messages(target_bot, limit=1)
                         if verify_msg_list and verify_msg_list[0].reply_markup:
@@ -122,30 +140,48 @@ async def run_collector(session_string, account_index):
                             for row in v_msg.reply_markup.rows:
                                 for button in row.buttons:
                                     b_text = button.text.lower()
-                                    if any(kw in b_text for kw in ["تحقق", "تاكيد", "تأكيد", "تم", "✓", "✅"]):
-                                        print(f"✅ [الحساب #{account_index}] تم الضغط على زر التحقق: {button.text}")
+                                    if target_bot == "@EEObot" and any(kw in b_text for kw in ["تحقق", "✓", "✅"]):
+                                        print(f"Verified via: {button.text}")
                                         await v_msg.click(data=button.data)
-                                        await asyncio.sleep(4)
+                                        verified = True
+                                        break
+                                    elif target_bot == "@hhkra074bot" and any(kw in b_text for kw in ["تاكيد", "تأكيد"]):
+                                        print(f"Confirmed via: {button.text}")
+                                        await v_msg.click(data=button.data)
                                         verified = True
                                         break
                                 if verified:
                                     break
                         
+                        # و) الانتقال للمهمة التالية عبر زر "التالي ▶️" إن وجد
+                        await asyncio.sleep(4)
+                        next_msg_list = await client.get_messages(target_bot, limit=1)
+                        if next_msg_list and next_msg_list[0].reply_markup:
+                            n_msg = next_msg_list[0]
+                            for row in n_msg.reply_markup.rows:
+                                for button in n_msg.reply_markup.rows: # للتأكد من تفحص الأزرار
+                                    pass
+                                for button in row.buttons:
+                                    if "التالي" in button.text or "▶️" in button.text:
+                                        print(f"Moving to next task: {button.text}")
+                                        await n_msg.click(data=button.data)
+                                        break
+                        
                         await asyncio.sleep(8)
                         
                     except Exception as e:
-                        print(f"❌ خطأ في الحساب #{account_index}: {e}")
+                        print(f"Error occurred: {e}")
                         await asyncio.sleep(10)
                         break
                 
                 await asyncio.sleep(5)
             
-            print(f"⏳ [الحساب #{account_index}] استراحة أمان مؤقتة...")
+            print("Taking a security rest between rounds...")
             await asyncio.sleep(120)
 
 async def main():
     if not API_ID or not API_HASH or not SESSIONS or not TARGET_BOTS:
-        print("⚠️ خطأ: يرجى التأكد من ضبط المتغيرات في Railway.")
+        print("Error: Check environment variables in Railway.")
         return
 
     tasks = [run_collector(session, i + 1) for i, session in enumerate(SESSIONS)]
