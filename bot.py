@@ -7,8 +7,8 @@ API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 SESSIONS_RAW = os.getenv("SESSIONS_STRING", "")
 
-# جلب عدة بوتات تمويل مفصولة بفواصل (مثلاً: @bot1,@bot2,@bot3)
-TARGET_BOTS_RAW = os.getenv("TARGET_BOTS", "@funding_bot1,@funding_bot2")
+# جلب عدة بوتات تمويل مفصولة بفواصل
+TARGET_BOTS_RAW = os.getenv("TARGET_BOTS", "@EEObot,@hhkra074bot")
 TARGET_BOTS = [b.strip() for b in TARGET_BOTS_RAW.split(",") if b.strip()]
 
 SESSIONS = [s.strip() for s in SESSIONS_RAW.split(",") if s.strip()]
@@ -20,13 +20,11 @@ async def run_collector(session_string, account_index):
         print(f"🚀 الحساب #{account_index} متصل وجاهز للعمل بأمان.")
         
         while True:
-            # المرور على كل بوت تمويل واحد تلو الآخر
             for target_bot in TARGET_BOTS:
                 print(f"🔄 [الحساب #{account_index}] الانتقال إلى البوت: {target_bot}")
                 
-                # محاولة التجميع من هذا البوت لفترة أو حتى تنتهي قنواته
                 empty_rounds = 0
-                for _ in range(5):  .
+                for _ in range(5):
                     try:
                         await client.send_message(target_bot, '/start')
                         await asyncio.sleep(6)
@@ -47,11 +45,9 @@ async def run_collector(session_string, account_index):
                                     if any(word in text for word in ["اشتراك", "قناة", "انضمام", "تجميع"]):
                                         print(f"📌 [الحساب #{account_index}] انضمام عبر {target_bot} إلى: {button.text}")
                                         await last_msg.click(data=button.data)
-                                        # فاصل زمني أمان لحماية الحساب من الحظر
                                         await asyncio.sleep(8)
                                         action_taken = True
                                         
-                                        # محاولة الضغط على زر التحقق
                                         updated = await client.get_messages(target_bot, limit=1)
                                         if updated and updated[0].reply_markup:
                                             for r in updated[0].reply_markup.rows:
@@ -66,7 +62,6 @@ async def run_collector(session_string, account_index):
                             empty_rounds += 1
                             break
                         
-                        # استراحة قصيرة بين كل عملية تجميع وأخرى لحماية الحساب
                         await asyncio.sleep(15)
                         
                     except Exception as e:
@@ -74,11 +69,10 @@ async def run_collector(session_string, account_index):
                         await asyncio.sleep(20)
                         break
                 
-                # استراحة بين الانتقال من بوت لآخر
                 await asyncio.sleep(10)
             
-            print(f"⏳ [الحساب #{account_index}] انتهت جولة كل البوتات، استراحة أمان طويلة قبل إعادة الكرّة...")
-            await asyncio.sleep(300) # استراحة 5 دقائق لتجنب أي حظر مزعج
+            print(f"⏳ [الحساب #{account_index}] انتهت جولة كل البوتات، استراحة أمان طويلة...")
+            await asyncio.sleep(300)
 
 async def main():
     if not API_ID or not API_HASH or not SESSIONS or not TARGET_BOTS:
