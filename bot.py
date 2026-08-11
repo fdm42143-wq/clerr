@@ -7,6 +7,7 @@ API_ID = int(os.getenv("API_ID", "0"))
 API_HASH = os.getenv("API_HASH", "")
 SESSIONS_RAW = os.getenv("SESSIONS_STRING", "")
 
+# البوتان اللذان حددتهما للعمل بالتناوب
 TARGET_BOTS_RAW = os.getenv("TARGET_BOTS", "@EEObot,@hhkra074bot")
 TARGET_BOTS = [b.strip() for b in TARGET_BOTS_RAW.split(",") if b.strip()]
 SESSIONS = [s.strip() for s in SESSIONS_RAW.split(",") if s.strip()]
@@ -21,82 +22,81 @@ async def run_collector(session_string, account_index):
             for target_bot in TARGET_BOTS:
                 print(f"🔄 [الحساب #{account_index}] الانتقال إلى البوت: {target_bot}")
                 
-                for _ in range(5):
+                for _ in range(6):
                     try:
-                        # 1. إرسال أمر البدء
+                        # 1. إرسال أمر البدء للبوت الحالي
                         await client.send_message(target_bot, '/start')
                         await asyncio.sleep(4)
                         
                         messages = await client.get_messages(target_bot, limit=1)
                         if not messages or not messages[0].reply_markup:
-                            await asyncio.sleep(6)
+                            await asyncio.sleep(5)
                             continue
                         
                         last_msg = messages[0]
                         
-                        # 2. البحث والضغط على زر فتح قسم التجميع (قنوات / تيربو)
-                        section_clicked = False
+                        # 2. الضغط على زر "تجميع النقاط" أو "القنوات" من القائمة الرئيسية
+                        menu_clicked = False
                         for row in last_msg.reply_markup.rows:
                             for button in row.buttons:
                                 btn_text = button.text.lower()
-                                if any(w in btn_text for w in ["قنوات", "تيربو", "تجميع", "نقاط"]):
-                                    print(f"📌 [الحساب #{account_index}] الدخول إلى قسم: {button.text}")
+                                if any(w in btn_text for w in ["تجميع النقاط", "القنوات", "قنوات", "تيربو"]):
+                                    print(f"📌 [الحساب #{account_index}] الدخول عبر: {button.text}")
                                     await last_msg.click(data=button.data)
                                     await asyncio.sleep(4)
-                                    section_clicked = True
+                                    menu_clicked = True
                                     break
-                            if section_clicked:
+                            if menu_clicked:
                                 break
                         
-                        # إذا لم يجد زر قسم محدد، نفترض أن الرسالة تعرض القنوات مباشرة
-                        target_message = last_msg
-                        if section_clicked:
+                        current_msg = last_msg
+                        if menu_clicked:
                             new_msg = await client.get_messages(target_bot, limit=1)
                             if new_msg:
-                                target_message = new_msg[0]
+                                current_msg = new_msg[0]
                         
-                        # 3. البحث عن زر الاشتراك/الانضمام للقناة المطلوبة
-                        joined = False
-                        if target_message.reply_markup:
-                            for row in target_message.reply_markup.rows:
+                        # 3. الضغط على زر فتح القناة أو الاشتراك
+                        channel_opened = False
+                        if current_msg.reply_markup:
+                            for row in current_msg.reply_markup.rows:
                                 for button in row.buttons:
                                     text = button.text.lower()
-                                    # التحقق مما إذا كان الزر يوجه لقناة أو اشتراك
-                                    if any(word in text for word in ["اشتراك", "قناة", "انضمام", "رابط", "http", "t.me"]):
-                                        print(f"📌 [الحساب #{account_index}] محاولة الانضمام عبر الزر: {button.text}")
+                                    if any(word in text for word in ["افتح", "اشتراك", "انضمام", "قناة", "رابط"]):
+                                        print(f"📌 [الحساب #{account_index}] فتح القناة عبر: {button.text}")
                                         try:
-                                            await target_message.click(data=button.data)
+                                            await current_msg.click(data=button.data)
                                         except Exception:
-                                            pass # تجاهل الخطأ إذا كان الرابط خارجي ومتابعة العملية
-                                        
+                                            pass
                                         await asyncio.sleep(6)
-                                        joined = True
+                                        channel_opened = True
+                                        break
+                                if channel_opened:
+                                    break
                         
-                        if not joined:
-                            print(f"⚠️ [الحساب #{account_index}}} لا توجد قنوات حالياً في {target_bot}")
+                        if not channel_opened:
+                            print(f"⚠️ [الحساب #{account_index}] لا توجد قنوات متاحة حالياً في {target_bot}")
                             await asyncio.sleep(8)
                             break
                         
-                        # 4. البحث التلقائي عن زر (تحقق / تأكيد / تم) وضغطه مهما كانت صياغته
+                        # 4. الضغط التلقائي على زر التحقق أو التأكيد
                         await asyncio.sleep(4)
-                        updated_messages = await client.get_messages(target_bot, limit=1)
-                        if updated_messages and updated_messages[0].reply_markup:
+                        verify_msg_list = await client.get_messages(target_bot, limit=1)
+                        if verify_msg_list and verify_msg_list[0].reply_markup:
+                            v_msg = verify_msg_list[0]
                             verified = False
-                            up_msg = updated_messages[0]
-                            for r in up_msg.reply_markup.rows:
-                                for b in r.buttons:
-                                    b_text = b.text.lower()
-                                    # قائمة شاملة لكل أزرار التأكيد والتحقق الممكنة بمختلف البوتات
-                                    if any(kw in b_text for kw in ["تحقق", "تاكيد", "تأكيد", "تم", "التالي", "التأكيد", "✓", "✅"]):
-                                        print(f"✅ [الحساب #{account_index}] الضغط على زر التأكيد/التحقق: {b.text}")
-                                        await up_msg.click(data=b.data)
+                            for row in v_msg.reply_markup.rows:
+                                for button in row.buttons:
+                                    b_text = button.text.lower()
+                                    if any(kw in b_text for kw in ["تحقق", "تاكيد", "تأكيد", "تم", "✓", "✅"]):
+                                        print(f"✅ [الحساب #{account_index}] تم التحقق بنجاح عبر زر: {button.text}")
+                                        await v_msg.click(data=button.data)
                                         await asyncio.sleep(4)
                                         verified = True
                                         break
                                 if verified:
                                     break
                         
-                        await asyncio.sleep(10)
+                        await asyncio.sleep(8)
                         
                     except Exception as e:
                         print(f"❌ خطأ في الحساب #{account_index} مع {target_bot}: {e}")
@@ -105,12 +105,12 @@ async def run_collector(session_string, account_index):
                 
                 await asyncio.sleep(5)
             
-            print(f"⏳ [الحساب #{account_index}] استراحة قصيرة بين الجولات لتجنب الحظر...")
+            print(f"⏳ [الحساب #{account_index}] استراحة أمان بين الجولات...")
             await asyncio.sleep(120)
 
 async def main():
     if not API_ID or not API_HASH or not SESSIONS or not TARGET_BOTS:
-        print("⚠️ خطأ: يرجى التأكد من إدخال كافة المتغيرات في Railway.")
+        print("⚠️ خطأ: يرجى التحقق من متغيرات Railway.")
         return
 
     tasks = [run_collector(session, i + 1) for i, session in enumerate(SESSIONS)]
